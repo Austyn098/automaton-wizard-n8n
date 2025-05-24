@@ -1,0 +1,266 @@
+
+{
+  "name": "ODIAAA Product Deployment",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "deploy-product",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "deploy-product"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$node[\"Webhook Trigger\"].json[\"headers\"][\"x-n8n-secret\"]}}",
+              "value2": "your-secret-key"
+            }
+          ]
+        }
+      },
+      "id": "verify-secret",
+      "name": "Verify Secret",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.vercel.com/v1/deployments",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "vercelApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$credentials.vercelApi.token}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "name",
+              "value": "={{$node[\"Webhook Trigger\"].json[\"slug\"]}}"
+            },
+            {
+              "name": "gitSource",
+              "value": {
+                "type": "github",
+                "repo": "your-repo/product-template",
+                "ref": "main"
+              }
+            },
+            {
+              "name": "env",
+              "value": [
+                {
+                  "key": "PRODUCT_NAME",
+                  "value": "={{$node[\"Webhook Trigger\"].json[\"product_name\"]}}"
+                },
+                {
+                  "key": "PRODUCT_DESCRIPTION", 
+                  "value": "={{$node[\"Webhook Trigger\"].json[\"description\"]}}"
+                },
+                {
+                  "key": "PRODUCT_PRICE",
+                  "value": "={{$node[\"Webhook Trigger\"].json[\"price\"]}}"
+                },
+                {
+                  "key": "PRODUCT_SLUG",
+                  "value": "={{$node[\"Webhook Trigger\"].json[\"slug\"]}}"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "id": "deploy-to-vercel",
+      "name": "Deploy to Vercel",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [680, 200]
+    },
+    {
+      "parameters": {
+        "url": "={{$node[\"Webhook Trigger\"].json[\"callback_url\"] || \"https://jequlpvidimqlygeoxmd.supabase.co/functions/v1/deployment-webhook\"}}",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "deployment_id",
+              "value": "={{$node[\"Webhook Trigger\"].json[\"deployment_id\"]}}"
+            },
+            {
+              "name": "launch_id", 
+              "value": "={{$node[\"Webhook Trigger\"].json[\"launch_id\"]}}"
+            },
+            {
+              "name": "status",
+              "value": "success"
+            },
+            {
+              "name": "deployment_url",
+              "value": "https://{{$node[\"Webhook Trigger\"].json[\"slug\"]}}.vercel.app"
+            },
+            {
+              "name": "vercel_deployment_id",
+              "value": "={{$node[\"Deploy to Vercel\"].json[\"uid\"]}}"
+            }
+          ]
+        }
+      },
+      "id": "notify-success",
+      "name": "Notify Success",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "url": "={{$node[\"Webhook Trigger\"].json[\"callback_url\"] || \"https://jequlpvidimqlygeoxmd.supabase.co/functions/v1/deployment-webhook\"}}",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "deployment_id",
+              "value": "={{$node[\"Webhook Trigger\"].json[\"deployment_id\"]}}"
+            },
+            {
+              "name": "launch_id",
+              "value": "={{$node[\"Webhook Trigger\"].json[\"launch_id\"]}}"
+            },
+            {
+              "name": "status", 
+              "value": "failed"
+            },
+            {
+              "name": "error_details",
+              "value": "={{$node[\"Deploy to Vercel\"].json[\"error\"] || \"Deployment failed\"}}"
+            }
+          ]
+        }
+      },
+      "id": "notify-failure",
+      "name": "Notify Failure", 
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [900, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "Unauthorized"
+      },
+      "id": "unauthorized-response",
+      "name": "Unauthorized Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [680, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": {
+          "success": true,
+          "message": "Deployment initiated",
+          "deployment_id": "={{$node[\"Deploy to Vercel\"].json[\"uid\"]}}"
+        }
+      },
+      "id": "success-response",
+      "name": "Success Response",
+      "type": "n8n-nodes-base.respondToWebhook", 
+      "typeVersion": 1,
+      "position": [1120, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Verify Secret",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Secret": {
+      "main": [
+        [
+          {
+            "node": "Deploy to Vercel",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unauthorized Response",
+            "type": "main", 
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deploy to Vercel": {
+      "main": [
+        [
+          {
+            "node": "Notify Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Success": {
+      "main": [
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Failure": {
+      "main": [
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {},
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": ["odiaaa", "deployment", "automation"]
+}
