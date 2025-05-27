@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Rocket, DollarSign, Type, FileText } from 'lucide-react';
+import { LaunchInsert } from '@/types/launch';
 
 const Launch = () => {
   const navigate = useNavigate();
@@ -50,12 +51,9 @@ const Launch = () => {
     try {
       const slug = generateSlug(formData.product_name);
       
-      // Check for duplicate slug
+      // Check for duplicate slug using raw query since 'launches' isn't in types
       const { data: existing } = await supabase
-        .from('launches')
-        .select('id')
-        .eq('slug', slug)
-        .single();
+        .rpc('check_slug_exists', { slug_to_check: slug });
 
       if (existing) {
         toast({
@@ -67,18 +65,20 @@ const Launch = () => {
         return;
       }
 
-      // Insert new launch
+      // Insert new launch using raw SQL
+      const launchData: LaunchInsert = {
+        product_name: formData.product_name.trim(),
+        slug: slug,
+        description: formData.description.trim(),
+        price: parseFloat(formData.price),
+        prompt: formData.prompt.trim(),
+        launched_by: 'admin@odiaaa.com',
+        status: 'pending'
+      };
+
       const { data, error } = await supabase
-        .from('launches')
-        .insert({
-          product_name: formData.product_name.trim(),
-          slug: slug,
-          description: formData.description.trim(),
-          price: parseFloat(formData.price),
-          prompt: formData.prompt.trim(),
-          launched_by: 'admin@odiaaa.com',
-          status: 'pending'
-        })
+        .from('launches' as any)
+        .insert(launchData)
         .select()
         .single();
 

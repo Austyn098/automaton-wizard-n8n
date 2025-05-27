@@ -6,19 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { ExternalLink, Rocket, Clock, CheckCircle, XCircle, DollarSign } from 'lucide-react';
-
-interface Launch {
-  id: string;
-  product_name: string;
-  slug: string;
-  description: string;
-  price: number;
-  deployed: boolean;
-  status: string;
-  subdomain_url?: string;
-  created_at: string;
-  launched_by?: string;
-}
+import { Launch } from '@/types/launch';
 
 const Launches = () => {
   const [launches, setLaunches] = useState<Launch[]>([]);
@@ -53,7 +41,7 @@ const Launches = () => {
   const fetchLaunches = async () => {
     try {
       const { data, error } = await supabase
-        .from('launches')
+        .from('launches' as any)
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -67,7 +55,7 @@ const Launches = () => {
         return;
       }
 
-      setLaunches(data || []);
+      setLaunches(data as Launch[] || []);
     } catch (error) {
       console.error('Unexpected error:', error);
     } finally {
